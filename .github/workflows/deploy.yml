@@ -42,3 +42,22 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that the Pages URL serves the app
+        run: |
+          url="https://dohanp.github.io/silsub/"
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o page.html -w '%{http_code}' "$url") || true
+            if [ "$code" = "200" ] && grep -q '<div id="root">' page.html; then break; fi
+            echo "attempt $i: HTTP $code, retrying"; sleep 10
+          done
+          echo "page: HTTP $code"; test "$code" = "200"
+          js=$(grep -o '/silsub/assets/[^"]*\.js' page.html | head -1)
+          echo "bundle: $js"; test -n "$js"
+          jscode=$(curl -s -o app.js -w '%{http_code}' "https://dohanp.github.io$js")
+          echo "bundle: HTTP $jscode, $(wc -c < app.js) bytes"; test "$jscode" = "200"
+          grep -q 'mmol/L' app.js
